@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>与AI对话并作画</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd/dist/antd.min.css">
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/react/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/antd/dist/antd.min.js"></script>
+
+<script>
+  const { useState, useEffect } = React;
+  const { Button, Input, List } = antd;
+
+  const App = () => {
+    const [messages, setMessages] = useState([]);
+    const [inputValue, setInputValue] = useState("");
+
+    const handleSendMessage = () => {
+      if (inputValue.trim() === "") {
+        return;
+      }
+
+      const newMessages = [...messages, { sender: "user", content: inputValue }];
+      setMessages(newMessages);
+      setInputValue("");
+
+      if (inputValue === "结束") {
+        return;
+      }
+
+      fetch("/chat-with-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: inputValue })
+      })
+              .then(response => response.json())
+              .then(data => {
+                const aiReply = data.reply;
+                const newMessages = [...messages, { sender: "ai", content: aiReply }];
+                setMessages(newMessages);
+                if (aiReply.includes("给我作画")) {
+                  fetch("/generate-image", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt: aiReply })
+                  })
+                          .then(response => response.json())
+                          .then(data => {
+                            const imageLink = data.image_link;
+                            const newMessages = [...messages, { sender: "ai", content: `作画图片：${imageLink}` }];
+                            setMessages(newMessages);
+                          });
+                }
+              });
+    };
+
+    const handleChangeInput = e => {
+      setInputValue(e.target.value);
+    };
+
+    return (
+            <div style={{ width: 400, margin: "auto", marginTop: 20 }}>
+              <List
+                      dataSource={messages}
+                      renderItem={item => (
+                              <List.Item style={{ textAlign: item.sender === "user" ? "right" : "left" }}>
+                                <div>{item.content}</div>
+                              </List.Item>
+                      )}
+              />
+              <Input value={inputValue} onChange={handleChangeInput} placeholder="请输入消息" style={{ marginTop: 10 }} />
+              <Button type="primary" onClick={handleSendMessage} style={{ marginTop: 10 }}>发送</Button>
+            </div>
+    );
+  };
+
+  ReactDOM.render(<App />, document.getElementById("app"));
+</script>
+</body>
+</html>
